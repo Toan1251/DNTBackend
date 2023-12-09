@@ -32,7 +32,7 @@ const initializePassport = (passport) => {
 
     //JWT Strategy
     passport.use(new JWTStrategy({
-        jwtFromRequest: ExtractJWT.fromBodyField('login_token'),
+        jwtFromRequest: ExtractJWT.fromBodyField('verify_token'),
         secretOrKey: process.env.JWT_SECRET,
     }, async(token, done) => {
         try {

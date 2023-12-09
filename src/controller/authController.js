@@ -1,38 +1,8 @@
-const bcrypt = require('bcrypt');
-const User = require('../models/Models').User;
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
 
-//register
-register = async(req, res) => {
-    // Register logic here
-    try {
-        const { new_username, new_encoded_pw } = req.body;
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(new_encoded_pw, salt);
-
-        const newUser = new User({
-            username: new_username,
-            password: hashedPassword
-        });
-
-        await newUser.save();
-        res.status(200).send({
-            message: "User created successfully",
-            registering_status: "successful",
-            user: newUser
-        });
-    } catch (e) {
-        res.status(500).send({
-            message: "Internal server error",
-            registering_status: "failed",
-            error: e
-        });
-    }
-};
-
 //login
-login = (req, res) => {
+const login = (req, res) => {
     // Login logic here
     const login_token = jwt.sign({ user: req.user }, config.JWT_SECRET, { expiresIn: '24h' });
     res.status(200).send({
@@ -43,7 +13,7 @@ login = (req, res) => {
 };
 
 //login failed
-loginFailed = (req, res) => {
+const loginFailed = (req, res) => {
     // Login failed logic here
     res.status(401).send({
         message: 'login failed',
@@ -51,12 +21,19 @@ loginFailed = (req, res) => {
     });
 };
 
-verify = (req, res, next) => {
+const verify = (req, res, next) => {
     // Verify logic here
-    const token = req.body.login_token;
+    const token = req.body.verify_token;
     try {
-        const user_jwt = jwt.verify(token, config.JWT_SECRET);
-        next();
+        const user_jwt = jwt.verify(token, config.JWT_SECRET, (err, user) => {
+            if (err) return res.status(403).send({
+                message: 'Forbidden',
+                verify_status: 'failed'
+            });
+            req.user = user
+            next();
+        });
+
     } catch (e) {
         res.status(401).send({
             message: 'Unauthorized',
@@ -66,7 +43,7 @@ verify = (req, res, next) => {
 }
 
 //logout
-logout = (req, res) => {
+const logout = (req, res) => {
     // Logout logic here
     req.logout();
     res.status(200).send({
@@ -76,7 +53,6 @@ logout = (req, res) => {
 };
 
 const authController = {
-    register,
     login,
     loginFailed,
     verify,
