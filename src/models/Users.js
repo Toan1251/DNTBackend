@@ -5,6 +5,7 @@ const UserMealMap = require('./UserMealMap')
 const UserSchema = new mongoose.Schema({
     username: {
         type: String,
+        unique: true,
         require: true
     },
     password: {
