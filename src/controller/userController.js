@@ -1,8 +1,8 @@
 const bcrypt = require('bcrypt');
 const User = require('../models/Models').User;
+const { CustomError } = require('../middleware/errorhandle');
 
-
-const register = async(req, res) => {
+const register = async(req, res, next) => {
     // Register logic here
     try {
         const { new_username, new_encoded_pw } = req.body;
@@ -17,45 +17,41 @@ const register = async(req, res) => {
         await newUser.save();
         res.status(200).send({
             message: "User created successfully",
-            registering_status: "successful",
+            request_status: "successful",
             user: newUser
         });
     } catch (e) {
-        res.status(500).send({
-            message: "Internal server error",
-            registering_status: "failed",
-            error: e
-        });
+        next(e)
     }
 };
 
 const getUserById = async(id) => {
     try {
         const user = await User.findById(id);
+        if (!user) {
+            throw new CustomError("User not found", 404)
+        }
         return user
     } catch (e) {
         throw e;
     }
 };
 
-const getUser = async(req, res) => {
+const getUser = async(req, res, next) => {
     // Get user logic here
     try {
         const { id } = req.params;
         const user = await getUserById(id);
         res.status(200).send({
-            fetching_status: "successful",
+            request_status: "successful",
             user: user
         });
     } catch (e) {
-        res.status(500).send({
-            fetching_status: "failed",
-            error: e
-        });
+        next(e)
     }
 }
 
-const updateUserInfo = async(req, res) => {
+const updateUserInfo = async(req, res, next) => {
     try {
         const { id } = req.params;
         const user = await getUserById(id);
@@ -76,15 +72,12 @@ const updateUserInfo = async(req, res) => {
         await user.save();
 
         res.status(200).send({
-            updating_status: "successful",
+            request_status: "successful",
             user: user
         });
 
     } catch (e) {
-        res.status(500).send({
-            updating_status: "failed",
-            error: e
-        });
+        next(e)
     }
 }
 

@@ -12,7 +12,4 @@ router.post('/register', userController.register);
 // PUT /:id - Update a user by ID
 router.put('/:id', passport.authenticate('jwt', { session: false }), userController.updateUserInfo);
 
-// DELETE /:id - Delete a user by ID
-router.delete('/:id');
-
 module.exports = router;

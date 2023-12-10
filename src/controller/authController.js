@@ -1,46 +1,23 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
+const { CustomError } = require('../middleware/errorhandle');
 
 //login
-const login = (req, res) => {
+const login = (req, res, next) => {
     // Login logic here
     const login_token = jwt.sign({ user: req.user }, config.JWT_SECRET, { expiresIn: '24h' });
     res.status(200).send({
-        login_status: 'successful',
+        request_status: 'successful',
         login_token: login_token,
         user: req.user
     });
 };
 
 //login failed
-const loginFailed = (req, res) => {
+const loginFailed = (req, res, next) => {
     // Login failed logic here
-    res.status(401).send({
-        message: 'login failed',
-        login_status: 'failed'
-    });
+    next(new CustomError('Login failed', 401));
 };
-
-const verify = (req, res, next) => {
-    // Verify logic here
-    const token = req.body.verify_token;
-    try {
-        const user_jwt = jwt.verify(token, config.JWT_SECRET, (err, user) => {
-            if (err) return res.status(403).send({
-                message: 'Forbidden',
-                verify_status: 'failed'
-            });
-            req.user = user
-            next();
-        });
-
-    } catch (e) {
-        res.status(401).send({
-            message: 'Unauthorized',
-            verify_status: 'failed'
-        });
-    }
-}
 
 //logout
 const logout = (req, res) => {
@@ -48,14 +25,13 @@ const logout = (req, res) => {
     req.logout();
     res.status(200).send({
         message: 'Logout successful',
-        logout_status: 'successful'
+        request_status: 'successful'
     });
 };
 
 const authController = {
     login,
     loginFailed,
-    verify,
     logout
 }
 

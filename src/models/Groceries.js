@@ -5,6 +5,7 @@ const RecipeGroceryMap = require('./RecipeGroceryMap')
 const grocerySchema = new mongoose.Schema({
     name: {
         type: String,
+        unique: true,
         required: true
     },
     image_path: {

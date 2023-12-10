@@ -24,6 +24,7 @@ app.use(cookieParser())
 app.use(morgan("dev"))
 app.use('/static', express.static(path.join(__dirname, 'public')))
 
+//passport
 app.use(session({
     secret: config.SESSION_SECRET,
     cookie: {
@@ -32,16 +33,17 @@ app.use(session({
     resave: false,
     saveUninitialized: false
 }))
-
-//passport
 app.use(passport.initialize())
 app.use(passport.session())
-const initializePassport = require('./config/passport-config')
+const initializePassport = require('./middleware/passport')
 initializePassport(passport)
 
 //api
 const router = require('./router');
 app.use('/api', router)
+
+//error handler
+app.use(require('./middleware/errorhandle').errorHandler)
 
 //start server
 const port = config.PORT || 5000
