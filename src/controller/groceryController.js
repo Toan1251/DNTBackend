@@ -48,6 +48,9 @@ const getAllGroceries = async(req, res, next) => {
 const getGroceryById = async(id) => {
     try {
         const grocery = await Grocery.findById(id);
+        if (!grocery) {
+            throw new CustomError("Grocery not found", 404)
+        }
         return grocery;
     } catch (e) {
         throw e;
