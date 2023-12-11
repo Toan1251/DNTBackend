@@ -7,11 +7,11 @@ const upload = require('../middleware/upload');
 //create new grocery
 router.post('/create', upload.single('image'), groceryController.createGrocery);
 
-// //get all groceries
-// router.get('/', groceryController.getAllGroceries);
+//get all groceries
+router.get('/', groceryController.getAllGroceries);
 
-// //get grocery by id
-// router.get('/:id', groceryController.getGrocery);
+//get grocery by id
+router.get('/:id', groceryController.getGrocery);
 
 // //add grogeries to user groceries list
 // router.put('/add', groceryController.addGrocery);

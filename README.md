@@ -1,16 +1,20 @@
-# DNTBackEnd    
+# DNTBackEnd
 
-### Requirements      
+## Requirements
 
-Nodejs > v18, MongoDb > v7    
+Nodejs > v18, MongoDb using Replica set > v7 , Docker
 
-### Configuration    
+## Configuration
+
+### Server
 
 - Clone Backend ở đây
-- Mở Cmd chạy <code>npm install</code>
-- Tạo file <code>.env</code>
+- Mở Cmd chạy `npm install`
+- Tạo file `.env`
 - Mở tệp scr/config/config.js copy toàn bộ key vào .env và thay đổi các biến môi trường cho phù hợp
 
-### Running Server
+### Database(Setup Replica MongoDb)
 
-<code>npm run start</code>
+## Running Server  
+
+  `npm run start`

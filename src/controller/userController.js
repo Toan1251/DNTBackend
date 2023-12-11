@@ -6,15 +6,23 @@ const register = async(req, res, next) => {
     // Register logic here
     try {
         const { new_username, new_encoded_pw } = req.body;
+
+        //hashed password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(new_encoded_pw, salt);
 
+        //create new user and store in database
         const newUser = new User({
             username: new_username,
             password: hashedPassword
         });
+        try {
+            await newUser.save();
+        } catch (e) {
+            throw new CustomError("Username already exists", 400);
+        }
 
-        await newUser.save();
+        //response
         res.status(200).send({
             message: "User created successfully",
             request_status: "successful",
@@ -53,9 +61,11 @@ const getUser = async(req, res, next) => {
 
 const updateUserInfo = async(req, res, next) => {
     try {
+        //get user from database
         const { id } = req.params;
         const user = await getUserById(id);
 
+        //update user information
         const { height, weight, gender, dateOfBirth, login_cred } = req.body;
         user.information.height = height || user.information.height;
         user.information.weight = weight || user.information.weight;
@@ -69,7 +79,12 @@ const updateUserInfo = async(req, res, next) => {
             user.password = hashedPassword;
         }
 
-        await user.save();
+        //save change to database
+        try {
+            await user.save();
+        } catch (e) {
+            throw new CustomError("Bad Request", 400);
+        }
 
         res.status(200).send({
             request_status: "successful",
@@ -84,6 +99,7 @@ const updateUserInfo = async(req, res, next) => {
 const userController = {
     register,
     getUser,
+    getUserById,
     updateUserInfo
 };
 

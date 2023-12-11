@@ -1,4 +1,5 @@
 const multer = require('multer');
+const path = require('path');
 
 // get random number to avoid same filename
 const time = () => {
@@ -7,10 +8,9 @@ const time = () => {
 
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        cb(null, './public')
+        cb(null, path.join(__dirname, '/../../public'))
     },
     filename: (req, file, cb) => {
-        console.log(file)
         let filename = time() + "_" + file.originalname
         cb(null, filename)
     }

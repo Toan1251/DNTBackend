@@ -22,7 +22,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use(express.json())
 app.use(cookieParser())
 app.use(morgan("dev"))
-app.use('/static', express.static(path.join(__dirname, 'public')))
+app.use('/static', express.static(path.join(__dirname, '../public')))
 
 //passport
 app.use(session({
@@ -50,8 +50,10 @@ const port = config.PORT || 5000
 const server = app.listen(port, () => {
     console.log(`server is listening on port ${port}`)
     try {
-        mongoose.connect(config.MONGO_URI)
-        console.log('connected to mongodb')
+        mongoose.connect(config.MONGO_URI).then(() => {
+            console.log("mongodb is connected")
+        })
+
     } catch (e) {
         console.log(e)
     }
