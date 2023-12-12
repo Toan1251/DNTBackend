@@ -7,6 +7,10 @@ const register = async(req, res, next) => {
     try {
         const { new_username, new_encoded_pw } = req.body;
 
+        //check if username is already taken
+        const user = await User.findOne({ username: new_username });
+        if (user) throw new CustomError("Username already exists", 400);
+
         //hashed password
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(new_encoded_pw, salt);
@@ -16,11 +20,7 @@ const register = async(req, res, next) => {
             username: new_username,
             password: hashedPassword
         });
-        try {
-            await newUser.save();
-        } catch (e) {
-            throw new CustomError("Username already exists", 400);
-        }
+        await newUser.save();
 
         //response
         res.status(200).send({
