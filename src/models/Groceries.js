@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const UserGroceryMap = require('./UserGroceryMap')
 const RecipeGroceryMap = require('./RecipeGroceryMap')
+const { grocery_unit } = require('../config/constants')
 
 const grocerySchema = new mongoose.Schema({
     name: {
@@ -15,7 +16,7 @@ const grocerySchema = new mongoose.Schema({
     },
     unit: {
         type: String,
-        enum: ['liter', 'grams', 'number'], //Liter: Using for liquid grocery(milk, oil, v.v), Grams: Using for uncounted grocery(sugars, meat), Number: Using for counted grocery(eggs, tomatoes)
+        enum: grocery_unit, //Liter: Using for liquid grocery(milk, oil, v.v), Grams: Using for uncounted grocery(sugars, meat), Number: Using for counted grocery(eggs, tomatoes)
         required: true,
         default: 'grams'
     },

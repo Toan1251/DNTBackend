@@ -8,8 +8,8 @@ const initializePassport = (passport) => {
     //Local Strategy
     passport.use(new LocalStrategy({
         usernameField: 'username', // Replace 'email' with the actual field name for the username
-        passwordField: 'encoded_pw', // Replace 'password' with the actual field name for the password
-    }, async(username, encoded_pw, done) => {
+        passwordField: 'password', // Replace 'password' with the actual field name for the password
+    }, async(username, password, done) => {
         try {
             // Find the user by username
             const user = await User.findOne({ username });
@@ -18,7 +18,7 @@ const initializePassport = (passport) => {
             if (!user) {
                 return done(null, false, { message: 'cannot found user' });
             }
-            const isMatch = await bcrypt.compare(encoded_pw, user.password);
+            const isMatch = await bcrypt.compare(password, user.password);
             if (!isMatch) {
                 return done(null, false, { message: 'Invalid email or password' });
             }
@@ -32,7 +32,12 @@ const initializePassport = (passport) => {
 
     //JWT Strategy
     passport.use(new JWTStrategy({
-        jwtFromRequest: ExtractJWT.fromBodyField('verify_token'),
+        jwtFromRequest: ExtractJWT.fromExtractors([
+            ExtractJWT.fromBodyField('verify_token'),
+            ExtractJWT.fromHeader('verify_token'),
+            ExtractJWT.fromAuthHeaderAsBearerToken(),
+            ExtractJWT.fromUrlQueryParameter('verify_token')
+        ]),
         secretOrKey: process.env.JWT_SECRET,
     }, async(token, done) => {
         try {

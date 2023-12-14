@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const mongoose = require('mongoose');
+const { User } = require('../models/Models');
+const { CustomError } = require('../middleware/errorhandle');
 
 const removeFile = async(filePath) => {
     try {
@@ -10,24 +11,43 @@ const removeFile = async(filePath) => {
     }
 }
 
-const transaction = async(callbacks = []) => {
-    const session = await mongoose.startSession();
-    session.startTransaction();
+const getUserById = async(id, options = {}) => {
     try {
-        for (let callback of callbacks) {
-            await callback(session);
+        const user = await User.findById(id).select(options);
+        if (!user) {
+            throw new CustomError("User not found", 404)
         }
-        await session.commitTransaction();
-        session.endSession();
+        return user;
     } catch (e) {
-        await session.abortTransaction();
-        session.endSession();
+        throw new CustomError("User not found", 404)
+    }
+}
+
+const checkUserPermission = async(id, permission_level_required) => {
+    try {
+        const user = await getUserById(id);
+        if (user.Permission_level < permission_level_required) {
+            throw new CustomError("Permission denied", 403);
+        }
+    } catch (e) {
         throw e;
+    }
+}
+
+const validateRequestBody = async(joiSchema, body = {}) => {
+    try {
+        const validate = await joiSchema.validateAsync(body);
+        return validate;
+    } catch (err) {
+        throw new CustomError(err.details[0].message, 400);
     }
 }
 
 const helper = {
     removeFile,
+    getUserById,
+    checkUserPermission,
+    validateRequestBody
 }
 
 module.exports = helper

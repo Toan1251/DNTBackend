@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const MealRecipeMap = require('./MealRecipeMap')
-const UserMealMap = require('./UserMealMap')
+const UserMealMap = require('./UserMealMap');
+const RecipeGroceryMap = require('./RecipeGroceryMap');
 
 const recipeSchema = new mongoose.Schema({
     difficulty: {
@@ -34,7 +35,12 @@ const recipeSchema = new mongoose.Schema({
         required: true
     },
     MealRecipeMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: MealRecipeMap }],
-    UserMealMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: UserMealMap }]
+    RecipeGroceryMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: RecipeGroceryMap }],
+    author: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
 });
 
 const Recipe = mongoose.model('Recipe', recipeSchema);

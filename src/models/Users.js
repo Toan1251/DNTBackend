@@ -1,6 +1,7 @@
 const mongoose = require('mongoose')
 const UserGroceryMap = require('./UserGroceryMap')
 const UserMealMap = require('./UserMealMap')
+const { user_gender } = require('../config/constants')
 
 const UserSchema = new mongoose.Schema({
     username: {
@@ -27,7 +28,7 @@ const UserSchema = new mongoose.Schema({
         },
         gender: {
             type: String,
-            enum: ['male', 'female'], //add more gender if you like
+            enum: user_gender, //add more gender if you like
             default: 'female',
             require: true
         },
@@ -36,6 +37,12 @@ const UserSchema = new mongoose.Schema({
             default: Date.now(),
             require: true
         },
+    },
+    permission_level: {
+        type: Number,
+        enum: [0, 1, 2], //0: admin(can grant permission to other user), 1:trusted user(can modified almost infomation except other user infomation), 2: user
+        default: 2,
+        require: true
     },
     UserGroceryMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: UserGroceryMap }],
     UserMealMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: UserMealMap }]

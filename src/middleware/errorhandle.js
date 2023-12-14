@@ -17,7 +17,10 @@ const errorHandler = (err, req, res, next) => {
     return res.status(500).send({ error: 'Internal Server Error', detail: err, request_status: 'failed' });
 };
 
-module.exports = {
+const errorhandle = {
     errorHandler,
     CustomError
+
 }
+
+module.exports = errorhandle

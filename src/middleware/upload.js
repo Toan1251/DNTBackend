@@ -1,5 +1,6 @@
 const multer = require('multer');
 const path = require('path');
+const { CustomError } = require('./errorhandle')
 
 // get random number to avoid same filename
 const time = () => {
@@ -19,7 +20,7 @@ const storage = multer.diskStorage({
 const imageFilter = (req, file, cb) => {
     if (!file.originalname.match(/\.(jpg|jpeg|png|gif|jfif)$/)) {
         req.fileValidationError = 'Only image files are allowed';
-        return cb(new Error('Only image files are allowed'), false)
+        return cb(new CustomError('Only image files are allowed', 415), false)
     }
     cb(null, true)
 }

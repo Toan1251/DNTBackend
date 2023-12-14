@@ -1,47 +1,40 @@
 const bcrypt = require('bcrypt');
 const User = require('../models/Models').User;
 const { CustomError } = require('../middleware/errorhandle');
+const { user_gender } = require('../config/constants')
+const { getUserById, validateRequestBody } = require('../utils/helper')
+const joi = require('joi');
 
 const register = async(req, res, next) => {
     // Register logic here
+    const bodySchema = joi.object({
+        username: joi.string().alphanum().min(4).max(32).required(),
+        password: joi.string().min(4).required(),
+    })
     try {
-        const { new_username, new_encoded_pw } = req.body;
-
-        //check if username is already taken
-        const user = await User.findOne({ username: new_username });
+        const { username, password } = await validateRequestBody(bodySchema, req.body)
+            //check if username is already taken
+        const user = await User.findOne({ username: username });
         if (user) throw new CustomError("Username already exists", 400);
 
         //hashed password
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(new_encoded_pw, salt);
+        const hashedPassword = await bcrypt.hash(password, salt);
 
         //create new user and store in database
         const newUser = new User({
-            username: new_username,
+            username: username,
             password: hashedPassword
         });
         await newUser.save();
 
         //response
         res.status(200).send({
-            message: "User created successfully",
             request_status: "successful",
-            user: newUser
+            user_id: newUser._id
         });
     } catch (e) {
         next(e)
-    }
-};
-
-const getUserById = async(id) => {
-    try {
-        const user = await User.findById(id);
-        if (!user) {
-            throw new CustomError("User not found", 404)
-        }
-        return user
-    } catch (e) {
-        throw e;
     }
 };
 
@@ -49,7 +42,7 @@ const getUser = async(req, res, next) => {
     // Get user logic here
     try {
         const { id } = req.params;
-        const user = await getUserById(id);
+        const user = await getUserById(id, { password: 0 });
         res.status(200).send({
             request_status: "successful",
             user: user
@@ -60,35 +53,52 @@ const getUser = async(req, res, next) => {
 }
 
 const updateUserInfo = async(req, res, next) => {
+    const userInfoSchema = joi.object({
+        height: joi.number().min(0).max(300),
+        weight: joi.number().min(0).max(300),
+        gender: joi.string().valid(...user_gender),
+        dateOfBirth: joi.date().max('now'),
+        password: joi.string().min(4),
+        verify_token: joi.string()
+    })
     try {
         //get user from database
         const { id } = req.params;
         const user = await getUserById(id);
 
-        //update user information
-        const { height, weight, gender, dateOfBirth, login_cred } = req.body;
-        user.information.height = height || user.information.height;
-        user.information.weight = weight || user.information.weight;
-        user.information.gender = gender || user.information.gender;
-        user.information.dateOfBirth = dateOfBirth || user.information.dateOfBirth;
-        user.username = user.username || login_cred.username;
+        //validate input
+        const { height, weight, gender, dateOfBirth, password } = await validateRequestBody(userInfoSchema, req.body);
+        console.log()
 
-        if (login_cred !== undefined && login_cred.password !== undefined) {
+        //change user information
+        let hashedPassword;
+        if (password) {
             const salt = await bcrypt.genSalt(10);
-            const hashedPassword = await bcrypt.hash(login_cred.password, salt);
-            user.password = hashedPassword;
+            hashedPassword = await bcrypt.hash(password, salt);
         }
 
         //save change to database
         try {
-            await user.save();
+            await user.updateOne({
+                password: password ? hashedPassword : user.password,
+                information: {
+                    height: height || user.information.height,
+                    weight: weight || user.information.weight,
+                    gender: gender || user.information.gender,
+                    dateOfBirth: dateOfBirth || user.information.dateOfBirth,
+                }
+            })
         } catch (e) {
             throw new CustomError("Bad Request", 400);
         }
 
+        //ignore password field when update user information
+        const updatedUser = await getUserById(id, { password: 0 })
+
+        //response
         res.status(200).send({
             request_status: "successful",
-            user: user
+            user: updatedUser
         });
 
     } catch (e) {
@@ -99,7 +109,6 @@ const updateUserInfo = async(req, res, next) => {
 const userController = {
     register,
     getUser,
-    getUserById,
     updateUserInfo
 };
 

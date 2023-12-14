@@ -12,6 +12,6 @@ router.post('/login/local', passport.authenticate('local', {
 router.get('/login/failed', authController.loginFailed)
 
 //logout
-router.get('/logout', authController.logout)
+router.get('/logout', passport.authenticate('jwt', { session: false }), authController.logout)
 
 module.exports = router

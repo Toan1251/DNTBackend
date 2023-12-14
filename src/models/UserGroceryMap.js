@@ -20,6 +20,10 @@ const UserGroceryMapSchema = new mongoose.Schema({
         type: Date,
         default: Date.now(),
         required: true
+    },
+    isInBuyingList: {
+        type: Boolean,
+        default: false
     }
 });
 

@@ -1,14 +1,15 @@
 const jwt = require('jsonwebtoken');
 const config = require('../config/config');
 const { CustomError } = require('../middleware/errorhandle');
+const joi = require('joi');
 
 //login
 const login = (req, res, next) => {
     const token = jwt.sign({ user: req.user }, config.JWT_SECRET, { expiresIn: '24h' });
     res.status(200).send({
         request_status: 'successful',
-        login_token: token,
-        user: req.user
+        userid: req.user._id,
+        verify_token: token,
     });
 };
 
@@ -18,12 +19,14 @@ const loginFailed = (req, res, next) => {
 };
 
 //logout
-const logout = (req, res) => {
-    req.logout();
-    res.status(200).send({
-        message: 'Logout successful',
-        request_status: 'successful'
-    });
+const logout = (req, res, next) => {
+    req.logout((err) => {
+        if (err) next(err);
+        res.status(200).send({
+            message: 'Logout successful',
+            request_status: 'successful'
+        });
+    })
 };
 
 const authController = {

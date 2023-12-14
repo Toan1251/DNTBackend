@@ -4,23 +4,23 @@ const groceryController = require('../controller/groceryController');
 const passport = require('passport');
 const upload = require('../middleware/upload');
 
-//create new grocery
-router.post('/create', upload.single('image'), groceryController.createGrocery);
-
-//get all groceries
-router.get('/', groceryController.getAllGroceries);
+//get groceries by queries
+router.get('/', groceryController.getGroceriesByQueries);
 
 //get grocery by id
 router.get('/:id', groceryController.getGrocery);
 
-// //add grogeries to user groceries list
-// router.put('/add', groceryController.addGrocery);
+//create new grocery
+router.post('/create', passport.authenticate('jwt', { session: false }), upload.single('image'), groceryController.createGrocery);
 
-// //remove groceries from user groceries list
-// router.put('/remove', groceryController.removeGrocery);
+//add grogeries to user groceries list
+router.put('/add', passport.authenticate('jwt', { session: false }), groceryController.addGrocery);
 
-// //update grocery
-// router.put('/update', groceryController.updateGrocery);
+//remove groceries from user groceries list
+router.put('/remove', passport.authenticate('jwt', { session: false }), groceryController.removeGrocery);
+
+//update grocery information
+router.put('/:id/update', passport.authenticate('jwt', { session: false }), upload.single('image'), groceryController.updateGrocery);
 
 // //delete grocery
 // router.delete('/delete', groceryController.deleteGrocery);
