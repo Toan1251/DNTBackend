@@ -13,7 +13,7 @@ Nodejs > v20, MongoDb using Replica set > v7
 - Tạo file `.env`
 - Mở tệp scr/config/config.js copy toàn bộ key vào .env và thay đổi các biến môi trường cho phù hợp
 
-### Database(Setup Replica MongoDb in Local), Nếu sử dụng Atlas thì không cần
+### Database(Setup Replica MongoDb in Local), Nếu sử dụng Atlas hay hosting mongo thì không cần
 
 #### Requirement Docker > v24
 

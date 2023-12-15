@@ -37,6 +37,11 @@ const UserSchema = new mongoose.Schema({
             default: Date.now(),
             require: true
         },
+        goal: {
+            type: Number,
+            min: 0,
+            default: 2000,
+        }
     },
     permission_level: {
         type: Number,

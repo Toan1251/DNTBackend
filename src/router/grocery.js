@@ -19,13 +19,13 @@ router.put('/add', passport.authenticate('jwt', { session: false }), groceryCont
 //remove groceries from user groceries list
 router.put('/remove', passport.authenticate('jwt', { session: false }), groceryController.removeGrocery);
 
+//update grocery on user groceries list
+router.put('/update', passport.authenticate('jwt', { session: false }), groceryController.updateUserGrocery);
+
 //update grocery information
 router.put('/:id/update', passport.authenticate('jwt', { session: false }), upload.single('image'), groceryController.updateGrocery);
 
-// //delete grocery
-// router.delete('/delete', groceryController.deleteGrocery);
-
-// //update buying list
-// router.put('/buy', groceryController.updateBuyingList);
+//delete grocery
+router.delete('/:id', passport.authenticate('jwt', { session: false }), groceryController.deleteGrocery);
 
 module.exports = router;

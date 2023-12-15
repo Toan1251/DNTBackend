@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const MealRecipeMap = require('./MealRecipeMap')
 const UserMealMap = require('./UserMealMap')
+const User = require('./Users')
 
 const mealSchema = new mongoose.Schema({
     total_time_cook: { //minutes
@@ -12,7 +13,12 @@ const mealSchema = new mongoose.Schema({
         required: true
     },
     MealRecipeMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: MealRecipeMap }],
-    UserMealMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: UserMealMap }]
+    UserMealMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: UserMealMap }],
+    Creator: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: User,
+        required: true
+    }
 });
 
 const Meal = mongoose.model('Meal', mealSchema);

@@ -12,8 +12,10 @@ const register = async(req, res, next) => {
         password: joi.string().min(4).required(),
     })
     try {
+        //validate request body
         const { username, password } = await validateRequestBody(bodySchema, req.body)
-            //check if username is already taken
+
+        //check if username is already taken
         const user = await User.findOne({ username: username });
         if (user) throw new CustomError("Username already exists", 400);
 
@@ -30,7 +32,7 @@ const register = async(req, res, next) => {
 
         //response
         res.status(200).send({
-            request_status: "successful",
+            request_status: "success",
             user_id: newUser._id
         });
     } catch (e) {
@@ -44,7 +46,7 @@ const getUser = async(req, res, next) => {
         const { id } = req.params;
         const user = await getUserById(id, { password: 0 });
         res.status(200).send({
-            request_status: "successful",
+            request_status: "success",
             user: user
         });
     } catch (e) {
@@ -58,6 +60,7 @@ const updateUserInfo = async(req, res, next) => {
         weight: joi.number().min(0).max(300),
         gender: joi.string().valid(...user_gender),
         dateOfBirth: joi.date().max('now'),
+        goal: joi.number().positive(),
         password: joi.string().min(4),
         verify_token: joi.string()
     })
@@ -67,8 +70,11 @@ const updateUserInfo = async(req, res, next) => {
         const user = await getUserById(id);
 
         //validate input
-        const { height, weight, gender, dateOfBirth, password } = await validateRequestBody(userInfoSchema, req.body);
+        const { height, weight, gender, dateOfBirth, goal, password } = await validateRequestBody(userInfoSchema, req.body);
         console.log()
+
+        //cheking permission
+        if (user._id.toString() !== req.user._id.toString()) throw new CustomError("Permission denied", 403);
 
         //change user information
         let hashedPassword;
@@ -86,6 +92,7 @@ const updateUserInfo = async(req, res, next) => {
                     weight: weight || user.information.weight,
                     gender: gender || user.information.gender,
                     dateOfBirth: dateOfBirth || user.information.dateOfBirth,
+                    goal: goal || user.information.goal,
                 }
             })
         } catch (e) {
@@ -97,7 +104,7 @@ const updateUserInfo = async(req, res, next) => {
 
         //response
         res.status(200).send({
-            request_status: "successful",
+            request_status: "success",
             user: updatedUser
         });
 

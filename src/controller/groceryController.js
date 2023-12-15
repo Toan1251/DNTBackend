@@ -1,9 +1,8 @@
-const { Grocery, UserGroceryMap } = require('../models/Models');
+const { Grocery, UserGroceryMap, User, RecipeGroceryMap, Recipe } = require('../models/Models');
 const { CustomError } = require('../middleware/errorhandle');
 const { removeFile, getUserById, validateRequestBody } = require('../utils/helper');
 const { grocery_unit } = require('../config/constants')
 const joi = require('joi');
-const { $where } = require('../models/UserGroceryMap');
 
 //create new grocery
 const createGrocery = async(req, res, next) => {
@@ -16,7 +15,7 @@ const createGrocery = async(req, res, next) => {
     try {
         //check if user have permission to create grocery
         const user = await getUserById(req.user._id);
-        if (user.permission_level >= 2) throw new CustomError("Permission denied", 403);
+        if (user.permission_level >= 2) throw new CustomError("Permission denied", 403)
 
         //validate request body
         const { name, unit, kcal_per_unit } = await validateRequestBody(createSchema, req.body)
@@ -26,6 +25,7 @@ const createGrocery = async(req, res, next) => {
             name,
             unit,
             kcal_per_unit,
+            Creator: user._id,
             image_path: req.file.filename
         })
 
@@ -49,18 +49,35 @@ const createGrocery = async(req, res, next) => {
 
 //get all groceries for dropdown grocery menu by queries. 
 const getGroceriesByQueries = async(req, res, next) => {
-    const { name, user_id } = req.query
+    const querySchema = joi.object({
+        name: joi.string().min(3),
+        user_id: joi.string(),
+        is_in_buying_list: joi.boolean()
+    }).with('is_in_buying_list', 'user_id')
     try {
-        let queries = Grocery.find({})
+        //validate request query
+        const { name, user_id, is_in_buying_list } = await validateRequestBody(querySchema, req.query)
+
+        let queries = Grocery.find({}).select({
+            _id: 1,
+            name: 1,
+            image_path: 1,
+            unit: 1,
+            kcal_per_unit: 1
+        })
 
         //find groceries equiped by user have user_id
         if (user_id) {
-            const ugms = await UserGroceryMap.find({ user: user_id }, { grocery: 1, _id: 0 });
+            let ugms_queries = UserGroceryMap.find({ user: user_id }, { grocery: 1, _id: 0 });
+            if (is_in_buying_list) ugms_queries = ugms_queries.where({ isInBuyingList: is_in_buying_list })
+            ugms = await ugms_queries.exec();
             const grocery_ids = ugms.map((item) => item.grocery)
             queries = queries.where('_id').in(grocery_ids)
+
         }
         //find groceries have name
-        if (name) queries.where('name', new RegExp(`\\w*${name}\\w*`, 'i'))
+        if (name) queries = queries.where('name', new RegExp(`\\w*${name}\\w*`, 'i'))
+
         const groceries = await queries.exec();
         res.status(200).send({
             request_status: "success",
@@ -72,9 +89,9 @@ const getGroceriesByQueries = async(req, res, next) => {
 }
 
 //get grocery by id
-const getGroceryById = async(id) => {
+const getGroceryById = async(id, options = {}) => {
     try {
-        const grocery = await Grocery.findById(id);
+        const grocery = await Grocery.findById(id).select(options);
         if (!grocery) {
             throw new CustomError("Grocery not found", 404)
         }
@@ -142,7 +159,7 @@ const addGrocery = async(req, res, next) => {
 
         //response
         res.status(200).send({
-            request_status: "successful",
+            request_status: "success",
         })
     } catch (e) {
         next(e)
@@ -186,7 +203,7 @@ const removeGrocery = async(req, res, next) => {
 
         //response
         res.status(200).send({
-            request_status: "successful",
+            request_status: "success",
         })
     } catch (e) {
         next(e)
@@ -205,6 +222,7 @@ const updateGrocery = async(req, res, next) => {
         //check if user have permission to update grocery
         const user = await getUserById(req.user._id);
         if (user.permission_level >= 2) throw new CustomError("Permission denied", 403);
+        if (user.permission_level == 1 && user._id != grocery.Creator) throw new CustomError("You not creator of this grocery", 403)
 
         //validate request body
         const { name, unit, kcal_per_unit } = await validateRequestBody(updateSchema, req.body)
@@ -220,7 +238,7 @@ const updateGrocery = async(req, res, next) => {
 
         //response
         res.status(200).send({
-            request_status: "successful",
+            request_status: "success",
             groceryId: grocery._id
         })
     } catch (e) {
@@ -228,29 +246,95 @@ const updateGrocery = async(req, res, next) => {
     }
 }
 
-const deleteGrocery = async(req, res, next) => {
-    const deleteSchema = joi.object({
-        verify_token: joi.string(),
-        grocery_id: joi.string().required()
+//update grocery in wallet
+const updateUserGrocery = async(req, res, next) => {
+    const updateSchema = joi.object({
+        grocery_id: joi.string().required(),
+        amount: joi.number().positive(),
+        expiresDate: joi.date().min('now'),
+        verify_token: joi.string()
     })
     try {
-        //check if user have permission to delete grocery
+        //check if user have permission to update grocery
         const user = await getUserById(req.user._id);
-        if (user.permission_level >= 2) throw new CustomError("Permission denied", 403);
 
-        //delete grocery by transaction
-        const client_session = await Grocery.startSession();
+        //validate request body
+        const { grocery_id, amount, expiresDate } = await validateRequestBody(updateSchema, req.body)
 
+        //update grocery information
+        const update = await UserGroceryMap.updateOne({
+            user: user._id,
+            grocery: grocery_id
+        }, {
+            amount: amount,
+            expiresDate: expiresDate
+        })
 
-        //response
         res.status(200).send({
-            request_status: "successful",
-            groceryId: grocery._id
+            request_status: "success",
         })
     } catch (e) {
         next(e)
     }
+}
 
+//delete grocery and related records
+const deleteGrocery = async(req, res, next) => {
+    try {
+        const grocery_id = req.params.id;
+        // Check if grocery exists
+        const grocery = await getGroceryById(grocery_id);
+
+        // Check if user have permission to delete grocery
+        const user = await getUserById(req.user._id);
+        if (user.permission_level >= 2 || user.permission_level < 0) throw new CustomError("Permission denied", 403);
+        if (user.permission_level == 1 && user._id != grocery.Creator) throw new CustomError("You not creaator of this grocery", 403)
+
+        // Delete grocery and related records
+        const client_session = await Grocery.startSession();
+        try {
+            //find all user have grocery in their grocery list
+            const ugms = await UserGroceryMap.find({ grocery: grocery._id }).select({ user: 1, _id: 1 }).session(client_session);
+            const user_ids = ugms.map((item) => item.user);
+            const ugm_ids = ugms.map((item) => item._id);
+
+            //delete grocery from user grocery list
+            await UserGroceryMap.deleteMany({ grocery: grocery_id }).session(client_session);
+            await User.updateMany({
+                _id: { $in: user_ids }
+            }, {
+                $pull: { UserGroceryMaps: { $in: ugm_ids } }
+            }).session(client_session)
+
+            //delete grocery from recipe ingredient list
+            const rgms = await RecipeGroceryMap.find({ grocery: grocery_id }).select({ recipe: 1, _id: 1 }).session(client_session);
+            const recipe_ids = rgms.map((item) => item.recipe);
+            const rgm_ids = rgms.map((item) => item._id);
+            await RecipeGroceryMap.deleteMany({ grocery: grocery_id }).session(client_session);
+            await Recipe.updateMany({
+                _id: { $in: recipe_ids }
+            }, {
+                $pull: { RecipeGroceryMaps: { $in: rgm_ids } }
+            }).session(client_session)
+
+            //delete grocery
+            await grocery.deleteOne().session(client_session);
+
+        } catch (e) {
+            await client_session.abortTransaction();
+            throw e;
+        } finally {
+            await client_session.endSession();
+        }
+
+        // Response
+        res.status(200).send({
+            request_status: "success",
+            groceryId: grocery_id
+        });
+    } catch (e) {
+        next(e);
+    }
 }
 
 const groceryController = {
@@ -260,6 +344,7 @@ const groceryController = {
     addGrocery,
     removeGrocery,
     updateGrocery,
+    updateUserGrocery,
     deleteGrocery
 }
 

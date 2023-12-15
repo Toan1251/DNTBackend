@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const UserGroceryMap = require('./UserGroceryMap')
 const RecipeGroceryMap = require('./RecipeGroceryMap')
+const User = require('./Users')
 const { grocery_unit } = require('../config/constants')
 
 const grocerySchema = new mongoose.Schema({
@@ -25,7 +26,12 @@ const grocerySchema = new mongoose.Schema({
         required: true
     },
     UserGroceryMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: UserGroceryMap }],
-    RecipeGroceryMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: RecipeGroceryMap }]
+    RecipeGroceryMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: RecipeGroceryMap }],
+    Creator: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: User,
+        required: true
+    }
 
 }, { timestamps: true });
 
