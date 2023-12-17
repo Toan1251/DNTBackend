@@ -3,15 +3,22 @@ const cors = require('cors');
 const morgan = require('morgan');
 const path = require('path');
 const mongoose = require('mongoose')
+const dotenv = require('dotenv')
 const cookieParser = require('cookie-parser')
-const config = require('./config/config')
 const passport = require('passport')
 const session = require('express-session')
 const bodyParser = require('body-parser')
 
-//configuration
-const app = express();
+// configuration
+if (process.env.NODE_ENV) {
+    require('dotenv').config({ path: path.join(__dirname, `../.env.${process.env.NODE_ENV}.local`) });
+} else {
+    require('dotenv').config({ path: path.join(__dirname, '../.env') });
+}
 
+
+const config = require('./config/config')
+const app = express();
 app.use(cors({
     origin: config.CLIENT_URL,
     methods: ['GET', 'HEAD', 'PUT', 'POST', 'DELETE', 'PATCH'],
@@ -23,6 +30,8 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(morgan("dev"))
 app.use('/static', express.static(path.join(__dirname, '../public')))
+
+
 
 //passport
 app.use(session({

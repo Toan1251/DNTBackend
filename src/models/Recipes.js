@@ -4,6 +4,11 @@ const User = require('./Users')
 const RecipeGroceryMap = require('./RecipeGroceryMap');
 
 const recipeSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true,
+        unique: true
+    },
     difficulty: {
         type: Number,
         max: 10,

@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { User } = require('../models/Models');
 const { CustomError } = require('../middleware/errorhandle');
+const { populate } = require('../models/UserGroceryMap');
 
 const removeFile = async(filePath) => {
     try {
@@ -43,11 +44,43 @@ const validateRequestBody = async(joiSchema, body = {}) => {
     }
 }
 
+//query is a query object
+const paginate = async(Model, selector = {}, {
+    page = 1, //page
+    limit = 5, //limit for a page
+    field = {}, //field to select
+    sort = {}, //sort method,
+    populate = null
+}) => {
+    let p = parseInt(page),
+        l = parseInt(limit);
+    if (isNaN(p) || isNaN(l)) {
+        throw new CustomError(`Invalid page or limit!`);
+    }
+    try {
+        if (p < 1) throw new CustomError(`Invalid page number!`);
+        if (l < 1) throw new CustomError(`Invalid limit number!`);
+        let nextPage, prevPage
+        if (p > 1) prevPage = p - 1;
+        if (p * l < await Model.countDocuments(selector)) nextPage = p + 1;
+
+        const result = await Model.find(selector).populate(populate).select(field).skip((page - 1) * limit).limit(limit).sort(sort).exec();
+        return {
+            result: result,
+            nextPage: nextPage,
+            prevPage: prevPage,
+        }
+    } catch (error) {
+        throw error
+    }
+}
+
 const helper = {
     removeFile,
     getUserById,
     checkUserPermission,
-    validateRequestBody
+    validateRequestBody,
+    paginate
 }
 
 module.exports = helper

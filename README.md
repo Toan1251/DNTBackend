@@ -10,8 +10,7 @@ Nodejs > v20, MongoDb using Replica set > v7
 
 - Clone Backend ở đây
 - Mở Cmd chạy `npm install`
-- Tạo file `.env`
-- Mở tệp scr/config/config.js copy toàn bộ key vào .env và thay đổi các biến môi trường cho phù hợp
+- Xóa đuôi .example của file `.env.example` và điền các config phù hợp 
 
 ### Database(Setup Replica MongoDb in Local), Nếu sử dụng Atlas hay hosting mongo thì không cần
 
