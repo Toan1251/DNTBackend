@@ -4,6 +4,105 @@ const { removeFile, getUserById, validateRequestBody } = require('../utils/helpe
 const { grocery_unit } = require('../config/constants')
 const joi = require('joi');
 
+
+
+//GET api/grocery?name=...
+//get all groceries for dropdown grocery menu
+const getGroceriesByName = async(req, res, next) => {
+    const querySchema = joi.object({
+        name: joi.string(),
+    })
+    try {
+        //validate request query
+        const { name } = await validateRequestBody(querySchema, req.query)
+
+        let groceries = await Grocery.find({}).select({
+            _id: 1,
+            name: 1,
+            image_path: 1,
+            unit: 1,
+            kcal_per_unit: 1
+        }).where('name', new RegExp(`\\w*${name ? name: ''}\\w*`, 'i'))
+
+        res.status(200).send({
+            request_status: "success",
+            groceries: groceries
+        });
+    } catch (e) {
+        next(e)
+    }
+}
+
+//GET api/grocery/user?is_in_buying_list=...&name=...
+//get all user groceries list(wallet)
+const getUserGroceryList = async(req, res, next) => {
+    const querySchema = joi.object({
+        is_in_buying_list: joi.boolean(),
+        name: joi.string(),
+    })
+    try {
+        const { is_in_buying_list, name } = await validateRequestBody(querySchema, req.query)
+
+        const user_groceries = await UserGroceryMap.find({ user: req.user._id })
+            .populate({
+                path: 'grocery',
+                model: Grocery,
+                match: {
+                    name: {
+                        $regex: new RegExp(`\\w*${name ? name: ''}\\w*`, 'i')
+                    }
+                },
+                select: {
+                    _id: 1,
+                    image_path: 1,
+                    unit: 1,
+                    kcal_per_unit: 1,
+                    name: 1
+                }
+            }).where('isInBuyingList', is_in_buying_list || false).select({
+                _id: 1,
+                amount: 1,
+                expiresDate: 1,
+            }).sort({ expiresDate: 1 })
+
+        const result = user_groceries.filter((item) => item.grocery != null)
+
+        res.status(200).send({
+            request_status: "success",
+            user_groceries: result
+        });
+    } catch (e) {
+        next(e)
+    }
+}
+
+const getGroceryById = async(id, options = {}) => {
+    try {
+        const grocery = await Grocery.findById(id).select(options);
+        if (!grocery) {
+            throw new CustomError("Grocery not found", 404)
+        }
+        return grocery;
+    } catch (e) {
+        throw new CustomError("Grocery not found", 404)
+    }
+}
+
+//GET api/grocery/:id
+//get grocery by id
+const getGrocery = async(req, res, next) => {
+    try {
+        const grocery = await getGroceryById(req.params.id)
+        res.status(200).send({
+            request_status: "success",
+            grocery: grocery
+        });
+    } catch (e) {
+        next(e)
+    }
+}
+
+//POST api/grocery/create
 //create new grocery
 const createGrocery = async(req, res, next) => {
     const createSchema = joi.object({
@@ -47,96 +146,33 @@ const createGrocery = async(req, res, next) => {
     }
 };
 
-//get all groceries for dropdown grocery menu by queries. 
-const getGroceriesByQueries = async(req, res, next) => {
-    const querySchema = joi.object({
-        name: joi.string().min(3),
-        user_id: joi.string(),
-        is_in_buying_list: joi.boolean()
-    }).with('is_in_buying_list', 'user_id')
-    try {
-        //validate request query
-        const { name, user_id, is_in_buying_list } = await validateRequestBody(querySchema, req.query)
-
-        let queries = Grocery.find({}).select({
-            _id: 1,
-            name: 1,
-            image_path: 1,
-            unit: 1,
-            kcal_per_unit: 1
-        })
-
-        //find groceries equiped by user have user_id
-        if (user_id) {
-            let ugms_queries = UserGroceryMap.find({ user: user_id }, { grocery: 1, _id: 0 });
-            if (is_in_buying_list) ugms_queries = ugms_queries.where({ isInBuyingList: is_in_buying_list })
-            ugms = await ugms_queries.exec();
-            const grocery_ids = ugms.map((item) => item.grocery)
-            queries = queries.where('_id').in(grocery_ids)
-
-        }
-        //find groceries have name
-        if (name) queries = queries.where('name', new RegExp(`\\w*${name}\\w*`, 'i'))
-
-        const groceries = await queries.exec();
-        res.status(200).send({
-            request_status: "success",
-            groceries: groceries
-        });
-    } catch (e) {
-        next(e)
-    }
-}
-
-//get grocery by id
-const getGroceryById = async(id, options = {}) => {
-    try {
-        const grocery = await Grocery.findById(id).select(options);
-        if (!grocery) {
-            throw new CustomError("Grocery not found", 404)
-        }
-        return grocery;
-    } catch (e) {
-        throw new CustomError("Grocery not found", 404)
-    }
-}
-
-const getGrocery = async(req, res, next) => {
-    try {
-        const grocery = await getGroceryById(req.params.id)
-        res.status(200).send({
-            request_status: "success",
-            grocery: grocery
-        });
-    } catch (e) {
-        next(e)
-    }
-}
-
-//add grocery to user groceries list(wallet)
+//PUT api/grocery/add
+//add grocery to user groceries list(wallet) or buy list
 const addGrocery = async(req, res, next) => {
     const addSchema = joi.object({
         grocery_id: joi.string().required(),
         amount: joi.number().positive().required(),
-        expiresDate: joi.date().min('now').required(),
+        expires_date: joi.date().min('now').required(),
+        is_in_buying_list: joi.boolean(),
         verify_token: joi.string()
     })
     try {
         const user = await getUserById(req.user._id);
         //validate request body
-        const { grocery_id, amount, expiresDate } = await validateRequestBody(addSchema, req.body)
+        const { grocery_id, amount, expires_date, is_in_buying_list } = await validateRequestBody(addSchema, req.body)
         const grocery = await getGroceryById(grocery_id);
 
-        //check if grocery already exists in user grocery list
-        let userGroceryMap = await UserGroceryMap.findOne({ user: user._id, grocery: grocery._id });
-        if (userGroceryMap == null) {
-            userGroceryMap = new UserGroceryMap({
-                user: user._id,
-                grocery: grocery._id,
-                amount: amount,
-                expiresDate: expiresDate
-            })
-        } else throw new CustomError("Grocery already exists in user grocery list", 400)
+        //check if grocery already in user grocery buy list
+        let userGroceryMap = await UserGroceryMap.findOne({ grocery: grocery._id, user: user._id, isInBuyingList: true })
+        if (userGroceryMap != null) throw new CustomError("Grocery already in user grocery buy list", 400)
+
+        userGroceryMap = new UserGroceryMap({
+            user: user._id,
+            grocery: grocery._id,
+            amount: amount,
+            expiresDate: expires_date,
+            isInBuyingList: is_in_buying_list || false
+        })
 
         //using transaction to add grocery to user grocery map list
         const client_session = await UserGroceryMap.startSession();
@@ -160,29 +196,91 @@ const addGrocery = async(req, res, next) => {
         //response
         res.status(200).send({
             request_status: "success",
+            user_grocery: userGroceryMap
         })
     } catch (e) {
         next(e)
     }
 }
 
-//remove groceries from user groceries list(wallet)
-const removeGrocery = async(req, res, next) => {
-    const removeSchema = joi.object({
+//PUT api/grocery/update
+//update grocery information
+const updateGrocery = async(req, res, next) => {
+    const updateSchema = joi.object({
         grocery_id: joi.string().required(),
+        name: joi.string(),
+        unit: joi.string().valid(...grocery_unit),
+        kcal_per_unit: joi.number().positive(),
         verify_token: joi.string()
     })
     try {
+        //validate request body
+        const { grocery_id, name, unit, kcal_per_unit } = await validateRequestBody(updateSchema, req.body)
+        const grocery = await getGroceryById(grocery_id, { Creator: 1, _id: 1 });
+
+        //check if user have permission to update grocery
+        const user = await getUserById(req.user._id);
+        if (user.permission_level >= 2) throw new CustomError("Permission denied", 403);
+        if (user.permission_level == 1 && user._id != grocery.Creator) throw new CustomError("You not creator of this grocery", 403)
+
+        //update grocery information
+        await grocery.updateOne({
+            name: name || grocery.name,
+            unit: unit || grocery.unit,
+            kcal_per_unit: kcal_per_unit || grocery.kcal_per_unit,
+            image_path: req.file ? req.file.filename : grocery.image_path
+        })
+
+        //response
+        res.status(200).send({
+            request_status: "success",
+        })
+    } catch (e) {
+        next(e)
+    }
+}
+
+//PUT api/grocery/update/:id
+//update grocery in wallet
+const updateUserGrocery = async(req, res, next) => {
+    const updateSchema = joi.object({
+        amount: joi.number().positive(),
+        expires_date: joi.date().min('now'),
+        is_in_buying_list: joi.boolean(),
+        verify_token: joi.string()
+    })
+    try {
+        const userGroceryMap = await UserGroceryMap.findById(req.params.id);
+        if (userGroceryMap == null) throw new CustomError("Grocery not found in user grocery list", 404)
+            //validate request body
+        const { amount, expires_date, is_in_buying_list } = await validateRequestBody(updateSchema, req.body)
+
+        //update grocery information
+        const update = await userGroceryMap.updateOne({
+            amount: amount,
+            expiresDate: expires_date,
+            isInBuyingList: is_in_buying_list
+        })
+
+        res.status(200).send({
+            request_status: "success",
+        })
+    } catch (e) {
+        next(e)
+    }
+}
+
+//DELETE api/grocery/remove/:id
+//remove groceries from user groceries list(wallet)
+const removeGrocery = async(req, res, next) => {
+    try {
         //get user and grocery need to remove
         const user = await getUserById(req.user._id);
-        const { grocery_id } = await validateRequestBody(removeSchema, req.body)
-        const grocery = await getGroceryById(grocery_id);
-
-        const filter = { user: user._id, grocery: grocery._id };
-        const userGroceryMap = await UserGroceryMap.findOne(filter);
-        if (userGroceryMap == null) {
-            throw new CustomError("Grocery not found in user grocery list", 404)
+        const userGroceryMap = await UserGroceryMap.findById(req.params.id);
+        if (userGroceryMap == null || userGroceryMap.user != user._id) {
+            throw new CustomError("Grocery not found", 404)
         }
+        const grocery = await getGroceryById(userGroceryMap.grocery);
 
         //using transaction to remove grocery from user grocery map list
         const client_session = await UserGroceryMap.startSession();
@@ -210,74 +308,7 @@ const removeGrocery = async(req, res, next) => {
     }
 }
 
-//update grocery information
-const updateGrocery = async(req, res, next) => {
-    const updateSchema = joi.object({
-        name: joi.string(),
-        unit: joi.string().valid(...grocery_unit),
-        kcal_per_unit: joi.number().positive(),
-        verify_token: joi.string()
-    })
-    try {
-        //check if user have permission to update grocery
-        const user = await getUserById(req.user._id);
-        if (user.permission_level >= 2) throw new CustomError("Permission denied", 403);
-        if (user.permission_level == 1 && user._id != grocery.Creator) throw new CustomError("You not creator of this grocery", 403)
-
-        //validate request body
-        const { name, unit, kcal_per_unit } = await validateRequestBody(updateSchema, req.body)
-
-        //update grocery information
-        const grocery = await getGroceryById(req.params.id);
-        await grocery.updateOne({
-            name: name || grocery.name,
-            unit: unit || grocery.unit,
-            kcal_per_unit: kcal_per_unit || grocery.kcal_per_unit,
-            image_path: req.file ? req.file.filename : grocery.image_path
-        })
-
-        //response
-        res.status(200).send({
-            request_status: "success",
-            groceryId: grocery._id
-        })
-    } catch (e) {
-        next(e)
-    }
-}
-
-//update grocery in wallet
-const updateUserGrocery = async(req, res, next) => {
-    const updateSchema = joi.object({
-        grocery_id: joi.string().required(),
-        amount: joi.number().positive(),
-        expiresDate: joi.date().min('now'),
-        verify_token: joi.string()
-    })
-    try {
-        //check if user have permission to update grocery
-        const user = await getUserById(req.user._id);
-
-        //validate request body
-        const { grocery_id, amount, expiresDate } = await validateRequestBody(updateSchema, req.body)
-
-        //update grocery information
-        const update = await UserGroceryMap.updateOne({
-            user: user._id,
-            grocery: grocery_id
-        }, {
-            amount: amount,
-            expiresDate: expiresDate
-        })
-
-        res.status(200).send({
-            request_status: "success",
-        })
-    } catch (e) {
-        next(e)
-    }
-}
-
+//DELETE api/grocery/:id
 //delete grocery and related records
 const deleteGrocery = async(req, res, next) => {
     try {
@@ -339,7 +370,8 @@ const deleteGrocery = async(req, res, next) => {
 
 const groceryController = {
     createGrocery,
-    getGroceriesByQueries,
+    getGroceriesByName,
+    getUserGroceryList,
     getGrocery,
     addGrocery,
     removeGrocery,

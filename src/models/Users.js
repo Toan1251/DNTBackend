@@ -50,7 +50,7 @@ const UserSchema = new mongoose.Schema({
         require: true
     },
     UserGroceryMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: UserGroceryMap }],
-    UserMealMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: UserMealMap }]
+    UserMealMaps: [{ type: mongoose.Schema.Types.ObjectId, ref: UserMealMap }],
 
 }, { timestamps: true });
 

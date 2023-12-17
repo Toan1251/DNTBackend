@@ -41,7 +41,7 @@ const recipeSchema = new mongoose.Schema({
         ref: User,
         required: true
     }
-});
+}, { timestamps: true });
 
 const Recipe = mongoose.model('Recipe', recipeSchema);
 

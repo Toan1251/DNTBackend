@@ -5,7 +5,7 @@ const joi = require('joi');
 
 //login
 const login = (req, res, next) => {
-    const token = jwt.sign({ user: req.user }, config.JWT_SECRET, { expiresIn: '24h' });
+    const token = jwt.sign({ user: req.user }, config.JWT_SECRET, { expiresIn: '1y' });
     res.status(200).send({
         request_status: 'successful',
         userid: req.user._id,

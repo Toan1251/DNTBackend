@@ -23,7 +23,7 @@ const UserGroceryMapSchema = new mongoose.Schema({
     },
     isInBuyingList: {
         type: Boolean,
-        default: false
+        default: false,
     }
 });
 
