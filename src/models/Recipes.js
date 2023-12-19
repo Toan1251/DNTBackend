@@ -7,7 +7,6 @@ const recipeSchema = new mongoose.Schema({
     name: {
         type: String,
         required: true,
-        unique: true
     },
     difficulty: {
         type: Number,

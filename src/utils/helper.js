@@ -24,16 +24,6 @@ const getUserById = async(id, options = {}) => {
     }
 }
 
-const checkUserPermission = async(id, permission_level_required) => {
-    try {
-        const user = await getUserById(id);
-        if (user.Permission_level < permission_level_required) {
-            throw new CustomError("Permission denied", 403);
-        }
-    } catch (e) {
-        throw e;
-    }
-}
 
 const validateRequestBody = async(joiSchema, body = {}) => {
     try {
@@ -78,7 +68,6 @@ const paginate = async(Model, selector = {}, {
 const helper = {
     removeFile,
     getUserById,
-    checkUserPermission,
     validateRequestBody,
     paginate
 }

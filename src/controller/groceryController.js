@@ -64,7 +64,7 @@ const getUserGroceryList = async(req, res, next) => {
         limit: joi.number().positive(),
         by_expires_date: joi.allow('asc', 'desc', 'ascending', 'descending', 1, -1, '1', '-1'),
         by_name: joi.allow('asc', 'desc', 'ascending', 'descending', 1, -1, '1', '-1'),
-    })
+    }).xor('by_expires_date', 'by_name')
     try {
         const { is_in_buying_list, name, page, limit, by_expires_date, by_name } = await validateRequestBody(querySchema, req.query)
 
@@ -80,7 +80,6 @@ const getUserGroceryList = async(req, res, next) => {
             }).where('isInBuyingList', is_in_buying_list || false)
 
         const grocery_ids = user_groceries.filter((item) => item.grocery != null).map((item) => item.grocery._id)
-        const user_grocery_ids = user_groceries.filter((item) => item.grocery != null).map((item) => item._id)
 
         const sortOption = {}
         if (by_expires_date) {
@@ -107,9 +106,9 @@ const getUserGroceryList = async(req, res, next) => {
                 path: 'UserGroceryMaps',
                 model: UserGroceryMap,
                 match: {
-                    _id: { $in: user_grocery_ids }
+                    user: req.user._id
                 },
-                select: { _id: 1 }
+                select: { _id: 1, amount: 1, expiresDate: 1 }
             }
         })
 
@@ -228,12 +227,13 @@ const addGrocery = async(req, res, next) => {
 
         //using transaction to add grocery to user grocery map list
         const client_session = await UserGroceryMap.startSession();
+        client_session.startTransaction();
         try {
             await userGroceryMap.save({ session: client_session });
 
             if (!user.UserGroceryMaps.includes(userGroceryMap._id)) {
                 await user.updateOne({
-                    $push: {
+                    $addToSet: {
                         UserGroceryMaps: userGroceryMap._id
                     }
                 }).session(client_session);
@@ -241,11 +241,12 @@ const addGrocery = async(req, res, next) => {
 
             if (!grocery.UserGroceryMaps.includes(userGroceryMap._id)) {
                 await grocery.updateOne({
-                    $push: {
+                    $addToSet: {
                         UserGroceryMaps: userGroceryMap._id
                     }
                 }).session(client_session);
             }
+            await client_session.commitTransaction();
         } catch (e) {
             await client_session.abortTransaction();
             throw e
@@ -281,7 +282,9 @@ const updateGrocery = async(req, res, next) => {
         //check if user have permission to update grocery
         const user = await getUserById(req.user._id);
         if (user.permission_level >= 2) throw new CustomError("Permission denied", 403);
-        if (user.permission_level == 1 && user._id != grocery.Creator) throw new CustomError("You not creator of this grocery", 403)
+        if (user.permission_level == 1) {
+            if (user._id.toString() != grocery.Creator.toString()) throw new CustomError("Permission denied", 403)
+        }
 
         //update grocery information
         await grocery.updateOne({
@@ -316,7 +319,7 @@ const updateUserGrocery = async(req, res, next) => {
         const { amount, expires_date, is_in_buying_list } = await validateRequestBody(updateSchema, req.body)
 
         //update grocery information
-        const update = await userGroceryMap.updateOne({
+        await userGroceryMap.updateOne({
             amount: amount,
             expiresDate: expires_date,
             isInBuyingList: is_in_buying_list
@@ -337,29 +340,31 @@ const removeGrocery = async(req, res, next) => {
         //get user and grocery need to remove
         const user = await getUserById(req.user._id);
         const userGroceryMap = await UserGroceryMap.findById(req.params.id);
-        if (userGroceryMap == null || userGroceryMap.user != user._id) {
+        if (userGroceryMap == null || userGroceryMap.user.toString() != user._id.toString()) {
             throw new CustomError("Grocery not found", 404)
         }
         const grocery = await getGroceryById(userGroceryMap.grocery);
 
         //using transaction to remove grocery from user grocery map list
         const client_session = await UserGroceryMap.startSession();
+        client_session.startTransaction();
         try {
             if (user.UserGroceryMaps.includes(userGroceryMap._id)) {
                 await user.updateOne({
-                    $pull: {
+                    $pullAll: {
                         UserGroceryMaps: userGroceryMap._id
                     }
                 }).session(client_session);
             }
             if (grocery.UserGroceryMaps.includes(userGroceryMap._id)) {
                 await grocery.updateOne({
-                    $pull: {
+                    $pullAll: {
                         UserGroceryMaps: userGroceryMap._id
                     }
                 }).session(client_session);
             }
-            await UserGroceryMap.deleteOne(filter).session(client_session);
+            await userGroceryMap.deleteOne().session(client_session);
+            await client_session.commitTransaction();
         } catch (e) {
             await client_session.abortTransaction();
             throw e
@@ -386,10 +391,14 @@ const deleteGrocery = async(req, res, next) => {
 
         // Check if user have permission to delete grocery
         const user = await getUserById(req.user._id);
-        if (user.permission_level >= 1 || user.permission_level < 0) throw new CustomError("You can't delete grocery", 403);
+        if (user.permission_level >= 2 || user.permission_level < 0) throw new CustomError("Permission denied", 403);
+        if (user.permission_level == 1) {
+            if (user._id.toString() != grocery.Creator.toString()) throw new CustomError("Permission denied", 403)
+        }
 
         // Delete grocery and related records
         const client_session = await Grocery.startSession();
+        client_session.startTransaction();
         try {
             //find all user have grocery in their grocery list
             const ugms = await UserGroceryMap.find({ grocery: grocery._id }).select({ user: 1, _id: 1 }).session(client_session);
@@ -401,7 +410,7 @@ const deleteGrocery = async(req, res, next) => {
             await User.updateMany({
                 _id: { $in: user_ids }
             }, {
-                $pull: { UserGroceryMaps: { $in: ugm_ids } }
+                $pullAll: { UserGroceryMaps: ugm_ids }
             }).session(client_session)
 
             //delete grocery from recipe ingredient list
@@ -412,14 +421,14 @@ const deleteGrocery = async(req, res, next) => {
             await Recipe.updateMany({
                 _id: { $in: recipe_ids }
             }, {
-                $pull: {
-                    RecipeGroceryMaps: { $in: rgm_ids }
+                $pullAll: {
+                    RecipeGroceryMaps: rgm_ids
                 }
             }).session(client_session)
 
             //delete grocery
             await grocery.deleteOne().session(client_session);
-
+            await client_session.commitTransaction();
         } catch (e) {
             await client_session.abortTransaction();
             throw e;
