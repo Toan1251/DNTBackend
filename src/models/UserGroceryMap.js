@@ -14,11 +14,13 @@ const UserGroceryMapSchema = new mongoose.Schema({
     amount: { //amount of Grocery
         type: Number,
         default: 0,
+        min: 0,
         required: true
     },
     expiresDate: {
         type: Date,
         default: Date.now(),
+        min: Date.now(),
         required: true
     },
     isInBuyingList: {

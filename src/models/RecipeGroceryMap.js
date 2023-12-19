@@ -9,6 +9,12 @@ const RecipeGroceryMapSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Grocery',
     },
+    amount: {
+        type: Number,
+        required: true,
+        default: 0,
+        min: 0
+    },
 });
 
 const RecipeGroceryMap = mongoose.model('RecipeGroceryMap', RecipeGroceryMapSchema);

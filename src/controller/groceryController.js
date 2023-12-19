@@ -26,7 +26,7 @@ const getGroceriesByName = async(req, res, next) => {
             sortOption.name = by_name
         }
 
-        const { result, nextPage, prevPage } = await paginate(Grocery, {
+        const { result, nextPage, prevPage, total } = await paginate(Grocery, {
             name: {
                 $regex: new RegExp(`\\w*${name ? name: ''}\\w*`, 'i'),
             }
@@ -47,7 +47,8 @@ const getGroceriesByName = async(req, res, next) => {
             request_status: "success",
             groceries: result,
             nextPage,
-            prevPage
+            prevPage,
+            total
         });
     } catch (e) {
         next(e)
@@ -89,7 +90,7 @@ const getUserGroceryList = async(req, res, next) => {
             sortOption.name = by_name
         }
 
-        const { result, nextPage, prevPage } = await paginate(Grocery, {
+        const { result, nextPage, prevPage, total } = await paginate(Grocery, {
             _id: { $in: grocery_ids }
         }, {
             page: page || 1,
@@ -116,7 +117,8 @@ const getUserGroceryList = async(req, res, next) => {
             request_status: "success",
             user_groceries: result,
             nextPage,
-            prevPage
+            prevPage,
+            total
         });
     } catch (e) {
         next(e)
@@ -161,7 +163,9 @@ const createGrocery = async(req, res, next) => {
     try {
         //check if user have permission to create grocery
         const user = await getUserById(req.user._id);
-        if (user.permission_level >= 2) throw new CustomError("Permission denied", 403)
+        if (user.permission_level != 0) {
+            if (user.permission_level >= 2) throw new CustomError("Permission denied", 403)
+        }
 
         //validate request body
         const { name, unit, kcal_per_unit } = await validateRequestBody(createSchema, req.body)
@@ -281,9 +285,11 @@ const updateGrocery = async(req, res, next) => {
 
         //check if user have permission to update grocery
         const user = await getUserById(req.user._id);
-        if (user.permission_level >= 2) throw new CustomError("Permission denied", 403);
-        if (user.permission_level == 1) {
-            if (user._id.toString() != grocery.Creator.toString()) throw new CustomError("Permission denied", 403)
+        if (user.permission_level != 0) {
+            if (user.permission_level >= 2) throw new CustomError("Permission denied", 403);
+            if (user.permission_level == 1) {
+                if (user._id.toString() != grocery.Creator.toString()) throw new CustomError("Permission denied", 403)
+            }
         }
 
         //update grocery information
@@ -391,9 +397,11 @@ const deleteGrocery = async(req, res, next) => {
 
         // Check if user have permission to delete grocery
         const user = await getUserById(req.user._id);
-        if (user.permission_level >= 2 || user.permission_level < 0) throw new CustomError("Permission denied", 403);
-        if (user.permission_level == 1) {
-            if (user._id.toString() != grocery.Creator.toString()) throw new CustomError("Permission denied", 403)
+        if (user.permission_level != 0) {
+            if (user.permission_level >= 2 || user.permission_level < 0) throw new CustomError("Permission denied", 403);
+            if (user.permission_level == 1) {
+                if (user._id.toString() != grocery.Creator.toString()) throw new CustomError("Permission denied", 403)
+            }
         }
 
         // Delete grocery and related records

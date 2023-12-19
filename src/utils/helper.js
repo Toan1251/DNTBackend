@@ -55,10 +55,12 @@ const paginate = async(Model, selector = {}, {
         if (p * l < await Model.countDocuments(selector)) nextPage = p + 1;
 
         const result = await Model.find(selector).populate(populate).select(field).skip((page - 1) * limit).limit(limit).sort(sort).exec();
+        const total = await Model.countDocuments(selector);
         return {
             result: result,
             nextPage: nextPage,
             prevPage: prevPage,
+            total: total
         }
     } catch (error) {
         throw error

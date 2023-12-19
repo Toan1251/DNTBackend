@@ -16,7 +16,6 @@ if (process.env.NODE_ENV) {
     require('dotenv').config({ path: path.join(__dirname, '../.env') });
 }
 
-
 const config = require('./config/config')
 const app = express();
 app.use(cors({
@@ -30,8 +29,6 @@ app.use(express.json())
 app.use(cookieParser())
 app.use(morgan("dev"))
 app.use('/static', express.static(path.join(__dirname, '../public')))
-
-
 
 //passport
 app.use(session({

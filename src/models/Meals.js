@@ -4,6 +4,10 @@ const UserMealMap = require('./UserMealMap')
 const User = require('./Users')
 
 const mealSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true
+    },
     total_time_cook: { //minutes
         type: Number,
         required: true

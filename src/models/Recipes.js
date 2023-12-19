@@ -30,7 +30,7 @@ const recipeSchema = new mongoose.Schema({
     kcal_per_serving: {
         type: Number,
         min: 0,
-        default: 300,
+        default: 0,
         required: true
     },
     recipe_in_text: {

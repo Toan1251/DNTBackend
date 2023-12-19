@@ -10,6 +10,13 @@ const UserMealMapSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Meal',
         required: true
+    },
+    schedule: [{
+        type: Date
+    }],
+    isScheduled: {
+        type: Boolean,
+        default: false
     }
 });
 
