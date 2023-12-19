@@ -50,6 +50,7 @@ app.use('/api', router)
 
 //error handler
 app.use(require('./middleware/errorhandle').errorHandler)
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, '../public/index.html')) })
 
 //start server
 const port = config.PORT || 5000
