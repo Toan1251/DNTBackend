@@ -170,7 +170,6 @@ const createGrocery = async(req, res, next) => {
         //validate request body
         const { name, unit, kcal_per_unit } = await validateRequestBody(createSchema, req.body)
 
-        //create new grocery
         const newGrocery = new Grocery({
             name,
             unit,
@@ -250,7 +249,9 @@ const addGrocery = async(req, res, next) => {
                     }
                 }).session(client_session);
             }
-            await client_session.commitTransaction();
+            if (client_session.inTransaction()) {
+                await client_session.commitTransaction();
+            }
         } catch (e) {
             await client_session.abortTransaction();
             throw e
@@ -370,7 +371,9 @@ const removeGrocery = async(req, res, next) => {
                 }).session(client_session);
             }
             await userGroceryMap.deleteOne().session(client_session);
-            await client_session.commitTransaction();
+            if (client_session.inTransaction()) {
+                await client_session.commitTransaction();
+            }
         } catch (e) {
             await client_session.abortTransaction();
             throw e
@@ -436,7 +439,9 @@ const deleteGrocery = async(req, res, next) => {
 
             //delete grocery
             await grocery.deleteOne().session(client_session);
-            await client_session.commitTransaction();
+            if (client_session.inTransaction()) {
+                await client_session.commitTransaction();
+            }
         } catch (e) {
             await client_session.abortTransaction();
             throw e;

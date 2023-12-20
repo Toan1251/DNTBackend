@@ -11,12 +11,12 @@ const bodyParser = require('body-parser')
 
 // configuration
 if (process.env.NODE_ENV) {
-    require('dotenv').config({ path: path.join(__dirname, `../.env.${process.env.NODE_ENV}.local`) });
+    require('dotenv').config({ path: path.join(__dirname, `.env.${process.env.NODE_ENV}.local`) });
 } else {
-    require('dotenv').config({ path: path.join(__dirname, '../.env') });
+    require('dotenv').config({ path: path.join(__dirname, '.env') });
 }
 
-const config = require('./config/config')
+const config = require('./src/config/config')
 const app = express();
 app.use(cors({
     origin: config.CLIENT_URL,
@@ -28,7 +28,7 @@ app.use(express.urlencoded({ extended: true }))
 app.use(express.json())
 app.use(cookieParser())
 app.use(morgan("dev"))
-app.use('/static', express.static(path.join(__dirname, '../public')))
+app.use('/static', express.static(path.join(__dirname, '/public')))
 
 //passport
 app.use(session({
@@ -41,16 +41,16 @@ app.use(session({
 }))
 app.use(passport.initialize())
 app.use(passport.session())
-const initializePassport = require('./middleware/passport')
+const initializePassport = require('./src/middleware/passport')
 initializePassport(passport)
 
 //api
-const router = require('./router');
+const router = require('./src/router');
 app.use('/api', router)
 
 //error handler
-app.use(require('./middleware/errorhandle').errorHandler)
-app.get('/', (req, res) => { res.sendFile(path.join(__dirname, '../public/index.html')) })
+app.use(require('./src/middleware/errorhandle').errorHandler)
+app.get('/', (req, res) => { res.sendFile(path.join(__dirname, '/public/index.html')) })
 
 //start server
 const port = config.PORT || 5000

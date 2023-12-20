@@ -13,11 +13,7 @@ const UserMealMapSchema = new mongoose.Schema({
     },
     schedule: [{
         type: Date
-    }],
-    isScheduled: {
-        type: Boolean,
-        default: false
-    }
+    }]
 });
 
 const UserMealMap = mongoose.model('UserMealMap', UserMealMapSchema);
