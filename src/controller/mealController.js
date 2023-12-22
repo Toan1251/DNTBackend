@@ -80,7 +80,7 @@ const getMealByQueries = async(req, res, next) => {
         //send response
         res.status(200).send({
             request_status: 'success',
-            result,
+            meals: result,
             nextPage,
             prevPage,
             total
@@ -107,11 +107,80 @@ const getUserMeals = async(req, res, next) => {
 const getMeal = async(req, res, next) => {
     try {
         // Logic to get a meal by ID
-        const meal = await getMealById(req.params.id);
+        const m = await getMealById(req.params.id);
+        if (m == null) throw new CustomError('Meal not found', 404);
+
+        const meal = await Meal.aggregate([{
+            $match: { _id: m._id }
+        }, {
+            $lookup: {
+                from: 'mealrecipemaps',
+                localField: 'MealRecipeMaps',
+                foreignField: '_id',
+                as: 'MealRecipeMap'
+            }
+        }, {
+            $unwind: '$MealRecipeMap'
+        }, {
+            $lookup: {
+                from: 'recipes',
+                localField: 'MealRecipeMap.recipe',
+                foreignField: '_id',
+                as: 'recipe'
+            }
+        }, {
+            $unwind: '$recipe'
+        }, {
+            $lookup: {
+                from: 'users',
+                localField: 'Creator',
+                foreignField: '_id',
+                as: 'Creator'
+            }
+        }, {
+            $unwind: '$Creator'
+        }, {
+            $project: {
+                '_id': 1,
+                'name': 1,
+                'total_time_cook': 1,
+                'total_kcal': 1,
+                'Creator._id': 1,
+                'Creator.username': 1,
+                'MealRecipeMap._id': 1,
+                'recipe._id': 1,
+                'recipe.name': 1,
+                'recipe.difficulty': 1,
+                'recipe.timeToCook': 1,
+                'recipe.timeToPrepare': 1,
+                'recipe.kcal_per_serving': 1,
+                'recipe.recipe_in_text': 1,
+            }
+        }])
+
+        const recipes = meal.map(m => {
+            return {
+                _id: m.recipe._id,
+                name: m.recipe.name,
+                difficulty: m.recipe.difficulty,
+                timeToCook: m.recipe.timeToCook,
+                timeToPrepare: m.recipe.timeToPrepare,
+                kcal_per_serving: m.recipe.kcal_per_serving,
+                recipe_in_text: m.recipe.recipe_in_text,
+                MealRecipeMap_id: m.MealRecipeMap._id,
+            }
+        })
 
         res.status(200).send({
             request_status: 'success',
-            meal
+            meal: {
+                _id: meal[0]._id,
+                name: meal[0].name,
+                total_time_cook: meal[0].total_time_cook,
+                total_kcal: meal[0].total_kcal,
+                Creator: meal[0].Creator,
+                recipes: recipes
+            }
         })
     } catch (err) {
         next(err);
@@ -178,10 +247,10 @@ const createMeal = async(req, res, next) => {
                 await client_session.commitTransaction();
             }
         } catch (err) {
-            client_session.abortTransaction();
+            await client_session.abortTransaction();
             throw err;
         } finally {
-            client_session.endSession();
+            await client_session.endSession();
         }
 
         const result = await getMealById(meal._id);
@@ -194,14 +263,13 @@ const createMeal = async(req, res, next) => {
     }
 };
 
-// 
-
 // PUT /api/meal/:id
 const updateMeal = async(req, res, next) => {
     const updateSchema = joi.object({
         name: joi.string(),
         total_time_cook: joi.number(),
         total_kcal: joi.number(),
+        verify_token: joi.string()
     })
     try {
         const { name, total_time_cook, total_kcal } = await validateRequestBody(updateSchema, req.body)
@@ -225,10 +293,11 @@ const updateMeal = async(req, res, next) => {
     }
 };
 
-//PUT /api/meal/add/:id
+//PUT /api/meal/recipe/add:id
 const addRecipeToMeal = async(req, res, next) => {
     const addSchema = joi.object({
-        recipes: joi.array().items(joi.string()).required()
+        recipes: joi.array().items(joi.string()).required(),
+        verify_token: joi.string()
     })
     try {
         //validate request body
@@ -287,10 +356,10 @@ const addRecipeToMeal = async(req, res, next) => {
                 await client_session.commitTransaction();
             }
         } catch (err) {
-            client_session.abortTransaction();
+            await client_session.abortTransaction();
             throw err;
         } finally {
-            client_session.endSession();
+            await client_session.endSession();
         }
 
         const updated = await getMealById(req.params.id);
@@ -304,23 +373,11 @@ const addRecipeToMeal = async(req, res, next) => {
     }
 };
 
-// -->TODO
-//PUT /api/meal/user/add/:id
-const addMealToUser = async(req, res, next) => {
-    const addSchema = joi.object({
-        schedules: joi.array().items(joi.date()).required()
-    })
-    try {
-        const { schedules } = await validateRequestBody(addSchema, req.body);
-    } catch (err) {
-        next(err);
-    }
-}
-
-//DELETE /api/meal/remove/:id
+//DELETE /api/meal/recipe/remove/:id
 const removeRecipeFromMeal = async(req, res, next) => {
     const removeSchema = joi.object({
-        recipes: joi.array().items(joi.string()).required()
+        recipes: joi.array().items(joi.string()).required(),
+        verify_token: joi.string()
     })
     try {
         //validate request body
@@ -381,10 +438,10 @@ const removeRecipeFromMeal = async(req, res, next) => {
                 await client_session.commitTransaction();
             }
         } catch (err) {
-            client_session.abortTransaction();
+            await client_session.abortTransaction();
             throw err;
         } finally {
-            client_session.endSession();
+            await client_session.endSession();
         }
 
         const updated = await getMealById(req.params.id);
@@ -397,26 +454,220 @@ const removeRecipeFromMeal = async(req, res, next) => {
     }
 };
 
-// -->TODO
-//DELETE /api/meal/user/remove/:id
-const removeMealFromUser = async(req, res, next) => {
-
-}
-
-// -->TODO
-const scheduleMeal = (req, res, next) => {
+//PUT /api/meal/user/add/:id
+const addMealToUser = async(req, res, next) => {
     try {
-        // Logic to schedule a meal
+        const user = await getUserById(req.user._id);
+        const meal = await getMealById(req.params.id);
+
+        const client_session = await User.startSession();
+        client_session.startTransaction();
+        try {
+            const umm = await UserMealMap.findOne({
+                $and: [
+                    { user: user._id },
+                    { meal: meal._id }
+                ]
+            }).session(client_session);
+
+            if (umm != null) throw new CustomError('Meal already added', 400);
+
+            const new_umm = new UserMealMap({
+                user: user._id,
+                meal: meal._id,
+            });
+            await new_umm.save({ session: client_session });
+
+            await user.updateOne({
+                $addToSet: {
+                    UserMealMaps: new_umm._id
+                }
+            }).session(client_session);
+
+            await meal.updateOne({
+                $addToSet: {
+                    UserMealMaps: new_umm._id
+                }
+            }).session(client_session);
+
+            if (client_session.inTransaction()) {
+                await client_session.commitTransaction();
+            }
+        } catch (err) {
+            await client_session.abortTransaction();
+            throw err;
+        } finally {
+            await client_session.endSession();
+        }
+
+        const umm = await UserMealMap.findOne({
+            $and: [
+                { user: user._id },
+                { meal: meal._id }
+            ]
+        })
+
+        res.status(200).send({
+            request_status: 'success',
+            user_meal_map: umm
+        })
+
+
     } catch (err) {
         next(err);
     }
+}
+
+//DELETE /api/meal/user/remove/:id
+const removeMealFromUser = async(req, res, next) => {
+    try {
+        const user = await getUserById(req.user._id);
+        const meal = await getMealById(req.params.id);
+
+        const umm = await UserMealMap.findOne({
+            $and: [
+                { user: user._id },
+                { meal: meal._id }
+            ]
+        })
+
+        if (umm == null) throw new CustomError("You don't add this meal", 404);
+
+        const client_session = await User.startSession();
+        client_session.startTransaction();
+        try {
+            await user.updateOne({
+                $pull: {
+                    UserMealMaps: umm._id
+                }
+            }).session(client_session);
+
+            await meal.updateOne({
+                $pull: {
+                    UserMealMaps: umm._id
+                }
+            }).session(client_session);
+
+            await umm.deleteOne({ session: client_session });
+
+            if (client_session.inTransaction()) {
+                await client_session.commitTransaction();
+            }
+        } catch (err) {
+            await client_session.abortTransaction();
+            throw err;
+        } finally {
+            await client_session.endSession();
+        }
+
+        res.status(200).send({
+            request_status: 'success',
+        })
+    } catch (err) {
+        next(err);
+    }
+}
+
+// PUT /api/meal/schedule/:id
+const scheduleMeal = async(req, res, next) => {
+    const scheduleSchema = joi.object({
+        schedules: joi.array().items(joi.object({
+            start: joi.date().required(),
+            end: joi.date().greater(joi.ref('start')).required()
+        })).required(),
+        verify_token: joi.string()
+    })
+    try {
+        //validate request body
+        const { schedules } = await validateRequestBody(scheduleSchema, req.body)
+
+        // get user and meal map
+        const user_meal_map = await UserMealMap.findOne({
+            $and: [
+                { user: req.user._id },
+                { meal: req.params.id }
+            ]
+        })
+
+        if (user_meal_map == null) throw new CustomError("You didn't add this meal", 404);
+
+        //set new Schedule
+        user_meal_map.set('schedules', schedules);
+        await user_meal_map.save();
+
+        res.status(200).send({
+            request_status: 'success'
+        })
+
+    } catch (err) {
+        next(err);
+    }
+
 };
 
 // -->TODO
 // DELETE /api/meal/:id
-const deleteMeal = (req, res, next) => {
+const deleteMeal = async(req, res, next) => {
     try {
-        // Logic to delete a meal by ID
+        const meal = await getMealById(req.params.id);
+        const user = await getUserById(req.user._id);
+
+        //check permission
+        if (user.permission_level != 0) {
+            if (meal.Creator.toString() != req.user._id.toString()) {
+                throw new CustomError('Permission denied', 403);
+            }
+        }
+
+        //delete meal by transaction
+        const client_session = await Meal.startSession();
+        client_session.startTransaction();
+        try {
+            //get meal recipe map ids
+            const mrm_ids = meal.get('MealRecipeMaps').map(mrm => mrm.toString())
+            const mrm = await MealRecipeMap.find({
+                _id: { $in: mrm_ids }
+            }).session(client_session);
+
+            await Promise.all(mrm.map(async(mrm) => {
+                const recipe = await Recipe.findById(mrm.recipe).session(client_session);
+                await recipe.updateOne({
+                    $pull: { MealRecipeMaps: mrm._id }
+                }).session(client_session);
+            }))
+            await MealRecipeMap.deleteMany({
+                _id: { $in: mrm_ids }
+            }).session(client_session);
+
+            const umm_ids = meal.get('UserMealMaps').map(umm => umm.toString())
+            const umm = await UserMealMap.find({
+                _id: { $in: umm_ids }
+            }).session(client_session);
+
+            await Promise.all(umm.map(async(umm) => {
+                const user = await User.findById(umm.user).session(client_session);
+                await user.updateOne({
+                    $pull: { UserMealMaps: umm._id }
+                }).session(client_session);
+            }))
+            await UserMealMap.deleteMany({
+                _id: { $in: umm_ids }
+            }).session(client_session);
+
+            await meal.deleteOne({ session: client_session });
+            if (client_session.inTransaction()) {
+                await client_session.commitTransaction();
+            }
+        } catch (err) {
+            await client_session.abortTransaction();
+            throw err;
+        } finally {
+            await client_session.endSession();
+        }
+
+        res.status(200).send({
+            request_status: 'success'
+        })
     } catch (err) {
         next(err);
     }

@@ -1,5 +1,5 @@
 const joi = require('joi');
-const { Recipe, RecipeGroceryMap, Grocery, Meal, MealRecipeMap } = require('../models/Models');
+const { Recipe, RecipeGroceryMap, Grocery, Meal, MealRecipeMap, User } = require('../models/Models');
 const { CustomError } = require('../middleware/errorhandle');
 const { paginate, validateRequestBody, getUserById } = require('../utils/helper');
 
@@ -19,10 +19,84 @@ const getRecipeById = async(recipeId, options = {}) => {
 // GET api/recipe/:id
 const getRecipe = async(req, res, next) => {
     try {
-        const recipe = await getRecipeById(req.params.id);
+        const r = await getRecipeById(req.params.id);
+        if (r == null) throw new CustomError('Recipe not found!', 404)
+
+        const recipe = await Recipe.aggregate([{
+            $match: { _id: r._id }
+        }, {
+            $lookup: {
+                from: 'recipegrocerymaps',
+                localField: 'RecipeGroceryMaps',
+                foreignField: '_id',
+                as: 'RecipeGroceryMap'
+            }
+        }, {
+            $unwind: '$RecipeGroceryMap'
+        }, {
+            $lookup: {
+                from: 'groceries',
+                localField: 'RecipeGroceryMap.grocery',
+                foreignField: '_id',
+                as: 'grocery'
+            }
+        }, {
+            $unwind: '$grocery'
+        }, {
+            $lookup: {
+                from: 'users',
+                localField: 'Creator',
+                foreignField: '_id',
+                as: 'Creator'
+            }
+        }, {
+            $unwind: '$Creator'
+        }, {
+            $project: {
+                '_id': 1,
+                'name': 1,
+                'difficulty': 1,
+                'timeToCook': 1,
+                'timeToPrepare': 1,
+                'kcal_per_serving': 1,
+                'recipe_in_text': 1,
+                'RecipeGroceryMap._id': 1,
+                'RecipeGroceryMap.amount': 1,
+                'grocery._id': 1,
+                'grocery.name': 1,
+                'grocery.image_path': 1,
+                'grocery.unit': 1,
+                'grocery.kcal_per_unit': 1,
+                'Creator._id': 1,
+                'Creator.username': 1,
+            }
+        }])
+
+        const groceries = recipe.map(r => {
+            return {
+                _id: r.grocery._id,
+                name: r.grocery.name,
+                image_path: r.grocery.image_path,
+                unit: r.grocery.unit,
+                kcal_per_unit: r.grocery.kcal_per_unit,
+                amount: r.RecipeGroceryMap.amount,
+                RecipeGroceryMap_id: r.RecipeGroceryMap._id,
+            }
+        })
+
         res.status(200).send({
             request_status: 'success',
-            recipe: recipe,
+            recipe: {
+                _id: recipe[0]._id,
+                name: recipe[0].name,
+                difficulty: recipe[0].difficulty,
+                timeToCook: recipe[0].timeToCook,
+                timeToPrepare: recipe[0].timeToPrepare,
+                kcal_per_serving: recipe[0].kcal_per_serving,
+                recipe_in_text: recipe[0].recipe_in_text,
+                Creator: recipe[0].Creator,
+                groceries,
+            }
         })
     } catch (error) {
         next(error);
@@ -173,10 +247,10 @@ const createRecipe = async(req, res, next) => {
                 await client_session.commitTransaction();
             }
         } catch (e) {
-            client_session.abortTransaction();
+            await client_session.abortTransaction();
             throw e
         } finally {
-            client_session.endSession();
+            await client_session.endSession();
         }
 
         // Return response
@@ -294,10 +368,10 @@ const addGroceriesToRecipe = async(req, res, next) => {
             }
 
         } catch (e) {
-            client_session.abortTransaction();
+            await client_session.abortTransaction();
             throw e;
         } finally {
-            client_session.endSession();
+            await client_session.endSession();
         }
 
         //get updated recipe and return response

@@ -33,15 +33,27 @@ router.put('/:id',
 )
 
 //add recipe to meal
-router.put('/add/:id',
+router.put('/recipe/add/:id',
     passport.authenticate('jwt', { session: false }),
     mealController.addRecipeToMeal
 )
 
 //remove recipe from meal
-router.put('/remove/:id',
+router.delete('/recipe/remove/:id',
     passport.authenticate('jwt', { session: false }),
     mealController.removeRecipeFromMeal
+)
+
+//add meal to user
+router.put('/user/add/:id',
+    passport.authenticate('jwt', { session: false }),
+    mealController.addMealToUser
+)
+
+//remove meal from user
+router.put('/user/remove/:id',
+    passport.authenticate('jwt', { session: false }),
+    mealController.removeMealFromUser
 )
 
 //schedule meal

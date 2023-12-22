@@ -13,7 +13,7 @@ const getGroceriesByName = async(req, res, next) => {
         limit: joi.number().positive(),
         by_expires_date: joi.allow('asc', 'desc', 'ascending', 'descending', 1, -1, '1', '-1'),
         by_name: joi.allow('asc', 'desc', 'ascending', 'descending', 1, -1, '1', '-1'),
-    }).xor('by_expires_date', 'by_name')
+    }).oxor('by_expires_date', 'by_name')
     try {
         //validate request query
         const { name, page, limit, by_expires_date, by_name } = await validateRequestBody(querySchema, req.query)
@@ -65,7 +65,7 @@ const getUserGroceryList = async(req, res, next) => {
         limit: joi.number().positive(),
         by_expires_date: joi.allow('asc', 'desc', 'ascending', 'descending', 1, -1, '1', '-1'),
         by_name: joi.allow('asc', 'desc', 'ascending', 'descending', 1, -1, '1', '-1'),
-    }).xor('by_expires_date', 'by_name')
+    }).oxor('by_expires_date', 'by_name')
     try {
         const { is_in_buying_list, name, page, limit, by_expires_date, by_name } = await validateRequestBody(querySchema, req.query)
 
@@ -141,10 +141,81 @@ const getGroceryById = async(id, options = {}) => {
 //get grocery by id
 const getGrocery = async(req, res, next) => {
     try {
-        const grocery = await getGroceryById(req.params.id)
+        const temp = await getGroceryById(req.params.id);
+        if (temp == 0) throw new CustomError("Grocery not found", 404)
+        const grocery = await Grocery.aggregate([{
+            $match: {
+                _id: temp._id
+            }
+        }, {
+            $project: {
+                _id: 1,
+                name: 1,
+                unit: 1,
+                kcal_per_unit: 1,
+                image_path: 1,
+            }
+        }, {
+            $lookup: {
+                from: 'recipegrocerymaps',
+                localField: '_id',
+                foreignField: 'grocery',
+                as: 'recipegrocerymap'
+            }
+        }, {
+            $unwind: '$recipegrocerymap'
+        }, {
+            $lookup: {
+                from: 'recipes',
+                localField: 'recipegrocerymap.recipe',
+                foreignField: '_id',
+                as: 'recipe'
+            }
+        }, {
+            $unwind: '$recipe'
+        }, {
+            $project: {
+                '_id': 1,
+                'name': 1,
+                'image_path': 1,
+                'unit': 1,
+                'kcal_per_unit': 1,
+                'recipegrocerymap._id': 1,
+                'recipegrocerymap.amount': 1,
+                'recipe._id': 1,
+                'recipe.name': 1,
+                'recipe.difficulty': 1,
+                'recipe.timeToCook': 1,
+                'recipe.timeToPrepare': 1,
+                'recipe.kcal_per_serving': 1,
+                'recipe.recipe_in_text': 1,
+            }
+        }])
+
+        const recipes = grocery.map(item => {
+            return {
+                _id: item.recipe._id,
+                name: item.recipe.name,
+                difficulty: item.recipe.difficulty,
+                timeToCook: item.recipe.timeToCook,
+                timeToPrepare: item.recipe.timeToPrepare,
+                kcal_per_serving: item.recipe.kcal_per_serving,
+                recipe_in_text: item.recipe.recipe_in_text,
+                amount: item.recipegrocerymap.amount,
+                RecipeGroceryMap_id: item.recipegrocerymap._id
+            }
+        })
+
         res.status(200).send({
             request_status: "success",
-            grocery: grocery
+            grocery: {
+                _id: grocery[0]._id,
+                name: grocery[0].name,
+                image_path: grocery[0].image_path,
+                unit: grocery[0].unit,
+                kcal_per_unit: grocery[0].kcal_per_unit,
+                recipes: recipes
+            }
         });
     } catch (e) {
         next(e)

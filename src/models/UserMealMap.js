@@ -11,8 +11,9 @@ const UserMealMapSchema = new mongoose.Schema({
         ref: 'Meal',
         required: true
     },
-    schedule: [{
-        type: Date
+    schedules: [{
+        start: { type: Date, required: true },
+        end: { type: Date, required: true },
     }]
 });
 
